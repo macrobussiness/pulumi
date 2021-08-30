@@ -69,6 +69,8 @@ type provider struct {
 	supportsPreview        bool                             // true if this plugin supports previews for Create and Update.
 	disableProviderPreview bool                             // true if previews for Create and Update are disabled.
 	legacyPreview          bool                             // enables legacy behavior for unconfigured provider previews.
+
+	acceptOutputs bool // true if this plugin accepts output values for Construct and Call.
 }
 
 // NewProvider attempts to bind to a given package's resource plugin and then creates a gRPC connection to it.  If the
@@ -514,6 +516,7 @@ func (p *provider) Configure(inputs resource.PropertyMap) error {
 		p.acceptSecrets = resp.GetAcceptSecrets()
 		p.acceptResources = resp.GetAcceptResources()
 		p.supportsPreview = resp.GetSupportsPreview()
+		p.acceptOutputs = resp.GetAcceptOutputs()
 
 		p.cfgknown, p.cfgerr = true, err
 		close(p.cfgdone)
@@ -1099,10 +1102,11 @@ func (p *provider) Construct(info ConstructInfo, typ tokens.Type, name tokens.QN
 
 	// Marshal the input properties.
 	minputs, err := MarshalProperties(inputs, MarshalOptions{
-		Label:         fmt.Sprintf("%s.inputs", label),
-		KeepUnknowns:  true,
-		KeepSecrets:   p.acceptSecrets,
-		KeepResources: p.acceptResources,
+		Label:            fmt.Sprintf("%s.inputs", label),
+		KeepUnknowns:     true,
+		KeepSecrets:      p.acceptSecrets,
+		KeepResources:    p.acceptResources,
+		KeepOutputValues: p.acceptOutputs,
 	})
 	if err != nil {
 		return ConstructResult{}, err
@@ -1350,10 +1354,11 @@ func (p *provider) Call(tok tokens.ModuleMember, args resource.PropertyMap, info
 	}
 
 	margs, err := MarshalProperties(args, MarshalOptions{
-		Label:         fmt.Sprintf("%s.args", label),
-		KeepUnknowns:  true,
-		KeepSecrets:   true,
-		KeepResources: true,
+		Label:            fmt.Sprintf("%s.args", label),
+		KeepUnknowns:     true,
+		KeepSecrets:      true,
+		KeepResources:    true,
+		KeepOutputValues: p.acceptOutputs,
 	})
 	if err != nil {
 		return CallResult{}, err

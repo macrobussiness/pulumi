@@ -405,6 +405,7 @@ type resmon struct {
 	cancel                    chan bool                          // a channel that can cancel the server.
 	done                      chan error                         // a channel that resolves when the server completes.
 	disableResourceReferences bool                               // true if resource references are disabled.
+	disableOutputValues       bool                               // true if output values are disabled.
 }
 
 var _ SourceResourceMonitor = (*resmon)(nil)
@@ -436,6 +437,7 @@ func newResourceMonitor(src *evalSource, provs ProviderSource, regChan chan *reg
 		regReadChan:               regReadChan,
 		cancel:                    cancel,
 		disableResourceReferences: opts.DisableResourceReferences,
+		disableOutputValues:       opts.DisableOutputValues,
 	}
 
 	// Fire up a gRPC server and start listening for incomings.
@@ -539,6 +541,8 @@ func (rm *resmon) SupportsFeature(ctx context.Context,
 		hasSupport = true
 	case "resourceReferences":
 		hasSupport = !rm.disableResourceReferences
+	case "outputValues":
+		hasSupport = !rm.disableOutputValues
 	}
 
 	logging.V(5).Infof("ResourceMonitor.SupportsFeature(id: %s) = %t", req.Id, hasSupport)
@@ -615,10 +619,11 @@ func (rm *resmon) Call(ctx context.Context, req *pulumirpc.CallRequest) (*pulumi
 
 	args, err := plugin.UnmarshalProperties(
 		req.GetArgs(), plugin.MarshalOptions{
-			Label:         label,
-			KeepUnknowns:  true,
-			KeepSecrets:   true,
-			KeepResources: true,
+			Label:            label,
+			KeepUnknowns:     true,
+			KeepSecrets:      true,
+			KeepResources:    true,
+			KeepOutputValues: true,
 		})
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to unmarshal %v args", tok)
@@ -904,6 +909,7 @@ func (rm *resmon) RegisterResource(ctx context.Context,
 			ComputeAssetHashes: true,
 			KeepSecrets:        true,
 			KeepResources:      true,
+			KeepOutputValues:   true,
 		})
 	if err != nil {
 		return nil, err
